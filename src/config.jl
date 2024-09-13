@@ -1,7 +1,11 @@
 module Config
 
+using Logging
+using Dates
+
 export INPUT, TICKS, BETA, GAMMA, DAYS, DT, OUTPUTDIR
 
+global TIMESTAMP = timestamp = Int(floor(datetime2unix(Dates.now()) * 1e3))
 global INPUT = "SingleCompartment1000k"
 global INPUTFILE = "SingleCompartment1000k.csv"
 global TICKS = 4
@@ -11,7 +15,12 @@ global DAYS = 150
 global DT = 1 / TICKS
 global OUTPUTDIR = "outputs/Julia"
 
-using Logging
+global GENERATION_LOOKBACK = 5
+global PRUNEDAY = 50
+global SCALE = 10
+global REMOVE_PROBABILITY = 1 - (1 / SCALE)
+global PRUNE = true
+
 
 function parseArgs!(args::Vector{String})
     for arg in args
@@ -38,13 +47,22 @@ function parseArgs!(args::Vector{String})
             elseif key == "DAYS"
                 global DAYS = parse(Int, value)
                 @info("Set DAYS to $DAYS")
+            elseif key == "LOOKBACK"
+                global GENERATION_LOOKBACK = parse(Int, value)
+                @info("Set LOOKBACK to $GENERATION_LOOKBACK")
+            elseif key == "PRUNE"
+                global PRUNE = parse(Int, value) == 1
+                @info("Set PRUNE to $PRUNE")
+            elseif key == "PRUNEDAY"
+                global PRUNEDAY = parse(Int, value)
+                @info("Set PRUNEDAY to $PRUNEDAY")
             else
                 throw(ArgumentError("Unsupported flag: \"$key\". Available flags are INPUT, TICKS, BETA, GAMMA, and DAYS."))
             end
         end
     end
 
-    # global OUTPUTDIR = "outputs/beta-$BETA-gamma-$GAMMA-input-$INPUT"
+    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY"
 end
 
 parseArgs!(ARGS)

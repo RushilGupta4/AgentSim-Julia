@@ -2,12 +2,18 @@ using CSV
 using DataFrames
 using Distributions
 using Dates
+using StatsBase
 using Base.Threads
 
 include("models.jl")
 include("config.jl")
-import .Models
-import .Config
+include("tree_utils.jl")
+include("interventions.jl")
+
+using .Models
+using .Config
+using .TreeUtils
+using .Interventions
 
 
 # Initialize all agents and their respective places
@@ -26,7 +32,7 @@ function initialize(file_path::String)
         isStudent = row.IsStudent
 
         infection_time = infection_state == :Infected ? 0 : -1
-        recovery_time = infection_state == :Infected ? rand(Exponential(1 / Config.GAMMA)) : 0
+        recovery_time = infection_state == :Infected ? rand(Exponential(1 / Config.GAMMA)) : 0.0
         scheduleID = isStudent ? 2 : 1 
 
         @assert houseID != 0
@@ -34,15 +40,16 @@ function initialize(file_path::String)
 
         # Create and add Person
         @inbounds agents[index] = Models.Person(
-            agentID,
-            houseID,
-            officeID,
-            schoolID,
-            infection_state,
-            infection_time,
-            recovery_time,
-            (houseID, :House), 
-            [scheduleID]
+            id=agentID,
+            houseID=houseID,
+            officeID=officeID,
+            schoolID=schoolID,
+            infection_state=infection_state,
+            infection_time=infection_time,
+            infected_by=-1,
+            recovery_time=recovery_time,
+            location=(houseID, :House), 
+            scheduleIDs=[scheduleID]
         )
         
         # Check and add places if they do not exist
@@ -84,6 +91,7 @@ function update_locations!(agents, places, schedules, time_of_day)
     for place in values(places)
         place.totalCount = 0
         place.infectedCount = 0
+        place.infectors = []
     end
 
     for agent in agents
@@ -94,6 +102,16 @@ function update_locations!(agents, places, schedules, time_of_day)
         places[new_location].totalCount += 1
         if agent.infection_state == :Infected
             places[new_location].infectedCount += 1
+            push!(places[new_location].infectors, (agent.id, 1))
+        end
+    end
+
+    # Loop over places, and update the infectors list so that it only has 1 infector, sampled from the infectors list. This should be a weighed probability, with place.infectors[i] = [agent, weight]
+    for place in values(places)
+        if place.infectedCount > 1
+            weights = [infector[2] for infector in place.infectors]
+            chosen_infector = sample(place.infectors, Weights(weights))
+            place.infectors = [chosen_infector]
         end
     end
 
@@ -113,12 +131,12 @@ function simulation_step!(agents::Vector{Models.Person}, places::Dict{Tuple{Int,
                 agent.infection_state = :Infected
                 agent.infection_time = step
                 agent.recovery_time = rand(Exponential(1 / Config.GAMMA))
+                agent.infected_by = place.infectors[1][1]
             end
         
         # Check for recovery
         elseif agent.infection_state == :Infected
             if rand() < Config.GAMMA * Config.DT
-            # if step >= agent.infection_time + agent.recovery_time * Config.TICKS
                 agent.infection_state = :Recovered
             end
         end
@@ -127,11 +145,10 @@ end
 
 # Main simulation loop
 function run_simulation()
-    timestamp = Int(floor(datetime2unix(Dates.now()) * 1e3))
     schedules = initialize_schedules()
     nagents, agents, places = initialize(Config.INPUTFILE)
-    results = DataFrame(Day = Int[], Susceptible = Int[], Infected = Int[], Recovered = Int[])
 
+    results = DataFrame(Day = Int[], Susceptible = Int[], Infected = Int[], Recovered = Int[])
     for step in 0:(Config.TICKS * Config.DAYS)
         if step % Config.TICKS == 0  # Daily summary
             sus = 0; inf = 0; rec = 0
@@ -153,6 +170,7 @@ function run_simulation()
             @assert sus + inf + rec == nagents
         end
 
+        Interventions.prune_infection!(agents, step)
         time_of_day = step % Config.TICKS
         update_locations!(agents, places, schedules, time_of_day)
         simulation_step!(agents, places, step)
@@ -160,8 +178,16 @@ function run_simulation()
 
     dir = Config.OUTPUTDIR
     isdir(dir) || mkpath(dir)
-    csvFile = "$dir/SIR$timestamp.csv"
+    csvFile = "$dir/SIR$(Config.TIMESTAMP).csv"
     CSV.write(csvFile, results)
+
+    # tracker = DataFrame(AgentID = Int[], InfectedBy = Int[], InfectionTime = Int[])
+    # for agent in agents
+    #     push!(tracker, [agent.id, agent.infected_by, agent.infection_time])
+    # end
+    # csvFile = "$dir/Agent$timestamp.csv"
+    # CSV.write(csvFile, tracker)
+
 end
 
 
