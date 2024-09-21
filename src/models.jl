@@ -7,11 +7,11 @@ export Place, Person, Model
 mutable struct Place
     id::Int
     location_type::Symbol
-    infectedCount::Int
     totalCount::Int
+    infectedCount::Int
     infectors::Vector{Tuple{Int, Float32}}
 
-    Place(id::Int, location_type::Symbol) = new(id, location_type, 0, 0, [])
+    Place(id::Int, location_type::Symbol) = new(id, location_type, 0, 0, 0, 0, [])
 end
 
 mutable struct Person

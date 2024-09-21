@@ -5,7 +5,7 @@ using Dates
 
 export INPUT, TICKS, BETA, GAMMA, DAYS, DT, OUTPUTDIR
 
-global TIMESTAMP = timestamp = Int(floor(datetime2unix(Dates.now()) * 1e3))
+global TIMESTAMP = Int(floor(datetime2unix(Dates.now()) * 1e3))
 global INPUT = "SingleCompartment1000k"
 global INPUTFILE = "SingleCompartment1000k.csv"
 global TICKS = 4
@@ -15,11 +15,11 @@ global DAYS = 150
 global DT = 1 / TICKS
 global OUTPUTDIR = "outputs/Julia"
 
-global GENERATION_LOOKBACK = 5
-global PRUNEDAY = 50
-global SCALE = 10
+global GENERATION_LOOKBACK = 0
+global PRUNEDAY = 0
+global SCALE = 1
 global REMOVE_PROBABILITY = 1 - (1 / SCALE)
-global PRUNE = true
+global PRUNE = false
 
 
 function parseArgs!(args::Vector{String})
@@ -64,7 +64,5 @@ function parseArgs!(args::Vector{String})
 
     global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY"
 end
-
-parseArgs!(ARGS)
 
 end

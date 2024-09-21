@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 import random
 
-TOTAL_POPULATION = 500 * 1000
-INITIAL_INFECTED = [1000, 0] # Total initial infected [CityA, CityB]
+TOTAL_POPULATION = 30 * 1000
+INITIAL_INFECTED = [300, 0]  # Total initial infected [CityA, CityB]
 HOUSEHOLD_SIZE = 4
-OFFICE_SIZE = 250
+OFFICE_SIZE = 100
 SCHOOL_SIZE = 150
-HOTEL_SIZE = 100 
+HOTEL_SIZE = 100
 NEIGHBOURHOOD_SIZE = 100  # 100 houses per neighborhood
 ESSENTIAL_WORKSPACE_PORTION = 0.1
 SINGLE_COMPARTMENT = False
@@ -69,11 +69,11 @@ def generate_entities(population, current_entity_count):
     total_neighbourhoods = total_houses // NEIGHBOURHOOD_SIZE
     total_neighbourhoods = 1
 
-    # if SINGLE_COMPARTMENT:
-    #     total_houses = 1
-    #     total_offices = 1
-    #     total_schools = 1
-    #     total_hotels = 1
+    if SINGLE_COMPARTMENT:
+        total_houses = 1
+        total_offices = 1
+        total_schools = 1
+        total_hotels = 1
 
     # Generate entity IDs
     houses = np.arange(1, total_houses + 1) + current_entity_count["houses"]

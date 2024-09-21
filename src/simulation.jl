@@ -143,6 +143,26 @@ function simulation_step!(agents::Vector{Models.Person}, places::Dict{Tuple{Int,
     end
 end
 
+
+function count_stats(nagents, agents)
+    sus = 0; inf = 0; rec = 0
+    for agent in agents
+        if agent.infection_state == :Susceptible
+            sus += 1
+        elseif agent.infection_state == :Infected
+            inf += 1
+        elseif agent.infection_state == :Recovered
+            rec += 1
+        else
+            @error "Invalid infection state for agent $(agent.id)"
+            throw(ArgumentError("Invalid infection state for agent $(agent.id)"))
+        end
+    end
+
+    @assert sus + inf + rec == nagents
+    return sus, inf, rec
+end
+
 # Main simulation loop
 function run_simulation()
     schedules = initialize_schedules()
@@ -150,29 +170,15 @@ function run_simulation()
 
     results = DataFrame(Day = Int[], Susceptible = Int[], Infected = Int[], Recovered = Int[])
     for step in 0:(Config.TICKS * Config.DAYS)
+        Interventions.prune_infection!(agents, step)
+        update_locations!(agents, places, schedules, step % Config.TICKS)
+
         if step % Config.TICKS == 0  # Daily summary
-            sus = 0; inf = 0; rec = 0
-            for agent in agents
-                if agent.infection_state == :Susceptible
-                    sus += 1
-                elseif agent.infection_state == :Infected
-                    inf += 1
-                elseif agent.infection_state == :Recovered
-                    rec += 1
-                else
-                    @error "Invalid infection state for agent $(agent.id)"
-                    throw(ArgumentError("Invalid infection state for agent $(agent.id)"))
-                end
-            end
+            sus, inf, rec = count_stats(nagents, agents)
             push!(results, [step ÷ Config.TICKS, sus, inf, rec])
             println("$(Dates.format(Dates.now(), "HH:MM:SS.sss")) | Day $(step ÷ Config.TICKS) | Susceptible: $sus | Infected: $inf | Recovered: $rec")
-
-            @assert sus + inf + rec == nagents
         end
-
-        Interventions.prune_infection!(agents, step)
-        time_of_day = step % Config.TICKS
-        update_locations!(agents, places, schedules, time_of_day)
+        
         simulation_step!(agents, places, step)
     end
 
@@ -185,11 +191,12 @@ function run_simulation()
     # for agent in agents
     #     push!(tracker, [agent.id, agent.infected_by, agent.infection_time])
     # end
-    # csvFile = "$dir/Agent$timestamp.csv"
+    # csvFile = "$dir/Agent$TIMESTAMP.csv"
     # CSV.write(csvFile, tracker)
-
 end
 
 
-run_simulation()
-
+if abspath(PROGRAM_FILE) == @__FILE__
+    Config.parseArgs!(ARGS)
+    run_simulation()
+end

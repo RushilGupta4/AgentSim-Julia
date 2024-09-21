@@ -31,7 +31,7 @@ function prune_infection!(agents::Vector{Models.Person}, step::Int)
         end
 
         # Filter predecessors to remove overlapping subtrees
-        filtered_predecessors = [p for p in predecessors if !any(q -> p in get_all_descendants(q), predecessors)]
+        filtered_predecessors = [p for p in predecessors if !any(q -> q in get_all_ancestors(p), predecessors)]
 
         # For each predecessor, with remove_probability, remove node and descendants
         to_remove = Set{Models.Person}()
@@ -55,8 +55,8 @@ function prune_infection!(agents::Vector{Models.Person}, step::Int)
             "totalSize" => total_size,
             "removedSize" => removed_size,
             "removedPercentage" => removed_percentage,
-            "removedIDs" => [person.id for person in to_remove],
-            "parentNodes" => [node.value.id for node in filtered_predecessors]
+            # "removedIDs" => [person.id for person in to_remove],
+            # "parentNodes" => [node.value.id for node in filtered_predecessors]
         )
 
         dir = Config.OUTPUTDIR
