@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 import random
 
-TOTAL_POPULATION = 30 * 1000
-INITIAL_INFECTED = [300, 0]  # Total initial infected [CityA, CityB]
+TOTAL_POPULATION = 100 * 1000
+INITIAL_INFECTED = [1000, 0]  # Total initial infected [CityA, CityB]
 HOUSEHOLD_SIZE = 4
 OFFICE_SIZE = 100
 SCHOOL_SIZE = 150
 HOTEL_SIZE = 100
-NEIGHBOURHOOD_SIZE = 100  # 100 houses per neighborhood
+NEIGHBOURHOOD_SIZE = 1000  # 100 houses per neighborhood
 ESSENTIAL_WORKSPACE_PORTION = 0.1
 SINGLE_COMPARTMENT = False
 TWO_CITIES = False
@@ -55,6 +55,21 @@ def generate_population(city, city_id):
     return population
 
 
+def assign_neighbourhood(place, neighbourhoods):
+    neighbourhood = random.choices(
+        [neighbourhood["NeighbourhoodID"] for neighbourhood in neighbourhoods],
+        weights=[
+            1
+            / (
+                (place["Latitude"] - neighbourhood["Latitude"]) ** 2
+                + (place["Longitude"] - neighbourhood["Longitude"]) ** 2
+            )
+            for neighbourhood in neighbourhoods
+        ],
+    )[0]
+    return neighbourhood
+
+
 def generate_entities(population, current_entity_count):
     # Determine the number of students and workers
     total_population = len(population)
@@ -67,7 +82,7 @@ def generate_entities(population, current_entity_count):
     total_offices = total_workers // OFFICE_SIZE
     total_schools = total_students // SCHOOL_SIZE
     total_neighbourhoods = total_houses // NEIGHBOURHOOD_SIZE
-    total_neighbourhoods = 1
+    # total_neighbourhoods = 1
 
     if SINGLE_COMPARTMENT:
         total_houses = 1

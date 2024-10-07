@@ -71,7 +71,6 @@ function prune_infection!(agents::Vector{Models.Person}, step::Int)
         for agent in to_remove
             agent.infection_state = :Susceptible
             agent.infection_time = -1
-            agent.recovery_time = 0.0
             agent.infected_by = -1
         end
 

@@ -11,13 +11,14 @@ global INPUTFILE = "SingleCompartment1000k.csv"
 global TICKS = 4
 global BETA = 0.35
 global GAMMA = 0.14
+global ALPHA = 0.0
 global DAYS = 150
 global DT = 1 / TICKS
 global OUTPUTDIR = "outputs/Julia"
 
 global GENERATION_LOOKBACK = 0
 global PRUNEDAY = 0
-global SCALE = 1
+global SCALE = 10
 global REMOVE_PROBABILITY = 1 - (1 / SCALE)
 global PRUNE = false
 
@@ -44,6 +45,9 @@ function parseArgs!(args::Vector{String})
             elseif key == "GAMMA"
                 global GAMMA = parse(Float64, value)
                 @info("Set GAMMA to $GAMMA")
+            elseif key == "ALPHA"
+                global ALPHA = parse(Float64, value)
+                @info("Set ALPHA to $ALPHA")
             elseif key == "DAYS"
                 global DAYS = parse(Int, value)
                 @info("Set DAYS to $DAYS")
@@ -62,7 +66,7 @@ function parseArgs!(args::Vector{String})
         end
     end
 
-    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY"
+    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY"
 end
 
 end
