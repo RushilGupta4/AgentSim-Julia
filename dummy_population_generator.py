@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import random
 
-TOTAL_POPULATION = 100 * 1000
-INITIAL_INFECTED = [1000, 0]  # Total initial infected [CityA, CityB]
+TOTAL_POPULATION = 5000 * 1000
+INITIAL_INFECTED = [100, 0]  # Total initial infected [CityA, CityB]
 HOUSEHOLD_SIZE = 4
 OFFICE_SIZE = 100
 SCHOOL_SIZE = 150
