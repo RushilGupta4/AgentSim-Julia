@@ -166,9 +166,6 @@ function simulation_step!(agents::Vector{Models.Person}, places::Dict{Tuple{Int,
             infection_rate = place_infection_rate + Config.ALPHA * group_infection_rate
             infection_prob = Config.BETA * infection_rate * Config.DT
 
-            # TODO: Keep a record of the number of people each agent has infected (add an attribute)
-            # TODO: Assert agent.infected_by is set correctly by comparing with this new attribute
-
             if rand() < infection_prob
                 if Config.ALPHA == 0.0f0 || rand() < place_infection_rate / infection_rate
                     idx = searchsortedfirst(place.cumsum_weights, rand() * place.cumsum_weights[end])

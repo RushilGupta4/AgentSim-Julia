@@ -21,6 +21,7 @@ global PRUNEDAY = 0
 global SCALE = 10
 global REMOVE_PROBABILITY = 1 - (1 / SCALE)
 global PRUNE = false
+global PRUNE_METHOD = "Random"
 
 
 function parseArgs!(args::Vector{String})
@@ -60,13 +61,16 @@ function parseArgs!(args::Vector{String})
             elseif key == "PRUNEDAY"
                 global PRUNEDAY = parse(Int, value)
                 @info("Set PRUNEDAY to $PRUNEDAY")
+            elseif key == "PRUNEMETHOD"
+                global PRUNE_METHOD = String(value)
+                @info("Set PRUNE_METHOD to $PRUNE_METHOD")
             else
                 throw(ArgumentError("Unsupported flag: \"$key\". Available flags are INPUT, TICKS, BETA, GAMMA, and DAYS."))
             end
         end
     end
 
-    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY"
+    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD"
 end
 
 end
