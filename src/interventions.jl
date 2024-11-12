@@ -84,6 +84,40 @@ function random_prune!(agents::Vector{Models.Person})
     return people, to_remove, prune_details
 end
 
+
+function random_location_prune!(agents::Vector{Models.Person})
+    people = [agent for agent in agents if agent.infection_state != :Susceptible]
+    to_remove = Set{Models.Person}()
+    houses_to_remove = Set{Int}()
+
+    houses = Set{Int}()
+    for person in people
+        push!(houses, person.houseID)
+    end
+
+    for house in houses
+        if rand() < Config.REMOVE_PROBABILITY
+            push!(houses_to_remove, house)
+        end
+    end
+
+    for person in people
+        if person.houseID in houses_to_remove
+            push!(to_remove, person)
+        end
+    end
+
+    prune_details = Dict(
+        "day" => Config.PRUNEDAY,
+        "totalSize" => length(people),
+        "removedSize" => length(to_remove),
+        "removedPercentage" => (length(to_remove) / length(people)) * 100.0,
+        "removedIDs" => [person.id for person in to_remove]
+    )
+
+    return people, to_remove, prune_details
+end
+
 function prune_infection!(agents::Vector{Models.Person}, step::Int)
     if !Config.PRUNE
         return
@@ -111,8 +145,10 @@ function prune_infection!(agents::Vector{Models.Person}, step::Int)
         people, to_remove, prune_details = generational_prune!(agents)
     elseif Config.PRUNE_METHOD == "Random"
         people, to_remove, prune_details = random_prune!(agents)
+    elseif Config.PRUNE_METHOD == "RandomLocation"
+        people, to_remove, prune_details = random_location_prune!(agents)
     else
-        throw(ArgumentError("Unsupported prune method: $(Config.PRUNE_METHOD). Supported methods are Generational and Random."))
+        throw(ArgumentError("Unsupported prune method: $(Config.PRUNE_METHOD). Supported methods are Generational, Random, and RandomLocation."))
     end
 
     dir = Config.OUTPUTDIR
