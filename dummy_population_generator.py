@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import random
 
-TOTAL_POPULATION = 500 * 1000
+TOTAL_POPULATION = 100 * 1000
 INITIAL_INFECTED = [100, 0]  # Total initial infected [CityA, CityB]
 HOUSEHOLD_SIZE = 4
 OFFICE_SIZE = 100
@@ -12,7 +12,7 @@ HOTEL_SIZE = 100
 NEIGHBOURHOOD_SIZE = 1000  # 100 houses per neighborhood
 ESSENTIAL_WORKSPACE_PORTION = 0.1
 SINGLE_COMPARTMENT = False
-TWO_CITIES = False
+TWO_CITIES = True
 INFECTIVITIES = ["Normal", "High"]
 INFECTIVITIES = ["Normal"]
 
@@ -82,7 +82,7 @@ def generate_entities(population, current_entity_count):
     total_offices = total_workers // OFFICE_SIZE
     total_schools = total_students // SCHOOL_SIZE
     total_neighbourhoods = total_houses // NEIGHBOURHOOD_SIZE
-    # total_neighbourhoods = 1
+    total_neighbourhoods = 1
 
     if SINGLE_COMPARTMENT:
         total_houses = 1
@@ -209,6 +209,7 @@ def assign_entities(city_id, city, population, entities):
         for is_student in population["IsStudent"]
     ]
     population["HotelID"] = [i["HotelID"] for i in hotels]
+    population["TravelCity"] = [ocity for _ in range(len(population))]
 
     if TWO_CITIES:
         population["TravelOfficeID"] = [

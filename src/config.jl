@@ -15,6 +15,7 @@ global ALPHA = 0.0
 global DAYS = 150
 global DT = 1 / TICKS
 global OUTPUTDIR = "outputs/Julia"
+global TRAVEL_PROBABILITY = 0.0
 
 global GENERATION_LOOKBACK = 0
 global PRUNEDAY = 0
@@ -64,13 +65,16 @@ function parseArgs!(args::Vector{String})
             elseif key == "PRUNEMETHOD"
                 global PRUNE_METHOD = String(value)
                 @info("Set PRUNE_METHOD to $PRUNE_METHOD")
+            elseif key == "TRAVEL"
+                global TRAVEL_PROBABILITY = parse(Float64, value)
+                @info("Set TRAVEL_PROBABILITY to $TRAVEL_PROBABILITY")
             else
                 throw(ArgumentError("Unsupported flag: \"$key\". Available flags are INPUT, TICKS, BETA, GAMMA, and DAYS."))
             end
         end
     end
 
-    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD"
+    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD-travel$TRAVEL_PROBABILITY"
 end
 
 end
