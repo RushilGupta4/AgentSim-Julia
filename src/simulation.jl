@@ -109,11 +109,6 @@ function initialize_schedules()
         2 => Dict(0 => :House, 1 => :School, 2 => :School, 3 => :House),
         3 => Dict(0 => :Hotel, 1 => :Office, 2 => :Office, 3 => :Hotel),
     )
-    schedules = Dict(
-        1 => Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House),
-        2 => Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House),
-        3 => Dict(0 => :Hotel, 1 => :Hotel, 2 => :Hotel, 3 => :Hotel),
-    )
     return schedules
 end
 
