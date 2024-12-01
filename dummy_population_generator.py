@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import random
 
-TOTAL_POPULATION = 100 * 1000
-INITIAL_INFECTED = [100, 0]  # Total initial infected [CityA, CityB]
+TOTAL_POPULATION = [5000 * 1000, 0]
+INITIAL_INFECTED = [100, 0]
 HOUSEHOLD_SIZE = 4
 OFFICE_SIZE = 100
 SCHOOL_SIZE = 150
@@ -12,7 +12,7 @@ HOTEL_SIZE = 100
 NEIGHBOURHOOD_SIZE = 1000  # 100 houses per neighborhood
 ESSENTIAL_WORKSPACE_PORTION = 0.1
 SINGLE_COMPARTMENT = False
-TWO_CITIES = True
+TWO_CITIES = False
 INFECTIVITIES = ["Normal", "High"]
 INFECTIVITIES = ["Normal"]
 
@@ -23,22 +23,22 @@ MIN_LATLONG = 0
 MAX_LATLONG = 90
 
 
-def generate_population(city, city_id):
+def generate_population(city, city_id, total_population):
     # Generate initial population with agent_id and age
-    agent_ids = city_id * TOTAL_POPULATION + np.arange(1, TOTAL_POPULATION + 1)
+    agent_ids = city_id * total_population + np.arange(1, total_population + 1)
 
     if SINGLE_COMPARTMENT:
-        ages = np.random.randint(20, 60, size=TOTAL_POPULATION)
+        ages = np.random.randint(20, 60, size=total_population)
     else:
-        ages = np.random.randint(5, 60, size=TOTAL_POPULATION)
+        ages = np.random.randint(5, 60, size=total_population)
 
-    infectivies = np.random.choice(INFECTIVITIES, size=TOTAL_POPULATION)
+    infectivies = np.random.choice(INFECTIVITIES, size=total_population)
 
     # Classify workers and students based on age
     workers = ages >= 18
     students = ages < 18
 
-    compliance = np.random.uniform(0, 1, size=TOTAL_POPULATION)
+    compliance = np.random.uniform(0, 1, size=total_population)
 
     population = pd.DataFrame(
         {
@@ -253,7 +253,7 @@ def main():
 
     for city_id, city in enumerate(cities):
         # Generate population
-        population = generate_population(city, city_id)
+        population = generate_population(city, city_id, TOTAL_POPULATION[city_id])
         populations[city] = population
 
         houses, hotels, offices, schools, neighbourhoods = generate_entities(
@@ -295,7 +295,9 @@ def main():
     if not file_path:
         file_path = "Dummy"
 
-    file_path = f"{file_path}{int(TOTAL_POPULATION/1000)}k"
+    file_path = (
+        f"{file_path}{','.join([str(int(i/1000)) for i in TOTAL_POPULATION if i])}k"
+    )
 
     df.to_csv(f"{file_path}.csv", index=False)
     print(file_path)
