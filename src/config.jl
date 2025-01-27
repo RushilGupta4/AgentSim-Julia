@@ -17,12 +17,15 @@ global DT = 1 / TICKS
 global OUTPUTDIR = "outputs/Julia"
 global TRAVEL_PROBABILITY = 0.0
 
-global GENERATION_LOOKBACK = 0
 global PRUNEDAY = 0
 global SCALE = 10
 global REMOVE_PROBABILITY = 1 - (1 / SCALE)
 global PRUNE = false
 global PRUNE_METHOD = "Random"
+
+global LOCKDOWN = false
+global LOCKDOWN_DAY = 0
+global LOCKDOWN_DURATION = 0
 
 
 function parseArgs!(args::Vector{String})
@@ -53,9 +56,6 @@ function parseArgs!(args::Vector{String})
             elseif key == "DAYS"
                 global DAYS = parse(Int, value)
                 @info("Set DAYS to $DAYS")
-            elseif key == "LOOKBACK"
-                global GENERATION_LOOKBACK = parse(Int, value)
-                @info("Set LOOKBACK to $GENERATION_LOOKBACK")
             elseif key == "PRUNE"
                 global PRUNE = parse(Int, value) == 1
                 @info("Set PRUNE to $PRUNE")
@@ -68,13 +68,22 @@ function parseArgs!(args::Vector{String})
             elseif key == "TRAVEL"
                 global TRAVEL_PROBABILITY = parse(Float64, value)
                 @info("Set TRAVEL_PROBABILITY to $TRAVEL_PROBABILITY")
+            elseif key == "LOCKDOWN"
+                global LOCKDOWN = parse(Int, value) == 1
+                @info("Set LOCKDOWN to $LOCKDOWN")
+            elseif key == "LOCKDOWNDAY"
+                global LOCKDOWN_DAY = parse(Int, value)
+                @info("Set LOCKDOWN_DAY to $LOCKDOWN_DAY")
+            elseif key == "LOCKDOWNDURATION"
+                global LOCKDOWN_DURATION = parse(Int, value)
+                @info("Set LOCKDOWN_DURATION to $LOCKDOWN_DURATION")
             else
                 throw(ArgumentError("Unsupported flag: \"$key\". Available flags are INPUT, TICKS, BETA, GAMMA, and DAYS."))
             end
         end
     end
 
-    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-lookback$GENERATION_LOOKBACK-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD-travel$TRAVEL_PROBABILITY"
+    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD-travel$TRAVEL_PROBABILITY-lockdown$LOCKDOWN-lockdownday$LOCKDOWN_DAY-lockdownduration$LOCKDOWN_DURATION"
 end
 
 end
