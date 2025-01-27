@@ -8,7 +8,7 @@ using Base.Threads
 include("models.jl")
 include("config.jl")
 include("tree_utils.jl")
-include("interventions.jl")
+include("interventions/interventions.jl")
 
 using .Models
 using .Config
@@ -105,9 +105,10 @@ end
 
 function initialize_schedules()
     schedules = Dict(
-        1 => Dict(0 => :House, 1 => :Office, 2 => :Office, 3 => :House),
-        2 => Dict(0 => :House, 1 => :School, 2 => :School, 3 => :House),
-        3 => Dict(0 => :Hotel, 1 => :Office, 2 => :Office, 3 => :Hotel),
+        1 => Dict(0 => :House, 1 => :Office, 2 => :Office, 3 => :House), # Employee
+        2 => Dict(0 => :House, 1 => :School, 2 => :School, 3 => :House), # Student
+        3 => Dict(0 => :Hotel, 1 => :Office, 2 => :Office, 3 => :Hotel), # Traveller
+        4 => Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House) # Lockdown / Stay at home
     )
     return schedules
 end
@@ -150,7 +151,7 @@ function update_locations!(agents, places, groups, schedules, time_of_day, step)
 
     for agent in agents
         # Check for travel
-        if agent.isTraveller && time_of_day == 0
+        if Config.TRAVEL_PROBABILITY > 0.0f0 && agent.isTraveller && time_of_day == 0
             if agent.originCity == agent.currentCity
                 # Agent is not travelling right now, and it is the start of the day
                 if rand() < Config.TRAVEL_PROBABILITY
@@ -294,6 +295,7 @@ function run_simulation()
 
     for step in 0:(Config.TICKS * Config.DAYS)
         Interventions.prune_infection!(agents, step)
+        Interventions.handle_lockdown!(agents, step)
         update_locations!(agents, places, groups, schedules, step % Config.TICKS, step)
 
         if step % Config.TICKS == 0  # Daily summary

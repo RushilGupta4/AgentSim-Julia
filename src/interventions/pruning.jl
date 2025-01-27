@@ -1,9 +1,7 @@
-# interventions.jl
-module Interventions
+module Pruning
 
 export prune_infection!
 
-using Dates
 using Main.TreeUtils
 import Main.Models
 import Main.Config
