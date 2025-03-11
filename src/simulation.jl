@@ -1,4 +1,5 @@
 using CSV
+using JSON
 using DataFrames
 using Distributions
 using Dates
@@ -19,83 +20,133 @@ using .Interventions
 # Initialize all agents and their respective places
 function initialize(file_path::String)
     df = CSV.File(file_path) |> DataFrame
-    nagents = nrow(df)
+    nagents = size(df, 1)
     agents = Vector{Models.Person}(undef, nagents)
-    places = Dict{Tuple{Int, Symbol, Symbol}, Models.Place}()
-    groups = Dict{Tuple{Int, Symbol, Symbol}, Models.PlaceGroup}()
+
+    # Places indexed by (place_id, place_type, city)
+    places = Dict{Tuple{Int,Symbol,Symbol},Models.Place}()
+    # Groups indexed by (group_id, :Neighbourhood, city)
+    groups = Dict{Tuple{Int,Symbol,Symbol},Models.PlaceGroup}()
 
     @inbounds for (index, row) in enumerate(eachrow(df))
+        # Basic agent info
         agentID = row.AgentID
-        infection_state = row.Infected == 1 ? :Infected : :Susceptible
-        houseID = row.HouseID
-        officeID = row.OfficeID
-        schoolID = row.SchoolID
         isStudent = row.IsStudent
-        houseNeighbourhoodID = row.HouseNeighbourhoodID
-        travelOfficeID = row.TravelOfficeID
-        travelHotelID = row.HotelID
-        hotelNeighbourhoodID = row.HotelNeighbourhoodID
-        travelsFor = row.TravelsFor
+        infection_state = row.Infected == 1 ? :Infected : :Susceptible
+        infection_time = infection_state == :Infected ? 0 : -1
+
+        houseID = row.HouseID
+        schoolID = row.SchoolID
         city = Symbol(row.City)
         travelCity = Symbol(row.TravelCity)
+        scheduleID = isStudent ? 2 : 1
 
-        infection_time = infection_state == :Infected ? 0 : -1
-        scheduleID = isStudent ? 2 : 1 
+        # ---- Parse JSON columns into Dict{Symbol,Int} ----
+        officeIDMap =
+            Dict{Symbol,Int}(Symbol(k) => v for (k, v) in pairs(JSON.parse(row.OfficeIDs)))
+        hotelIDMap =
+            Dict{Symbol,Int}(Symbol(k) => v for (k, v) in pairs(JSON.parse(row.HotelIDs)))
+        travelProbabilityMap = Dict{Symbol,Float32}(
+            Symbol(k) => v for (k, v) in pairs(JSON.parse(row.TravelProbabilities))
+        )
+        travelsForMap =
+            Dict{Symbol,Int}(Symbol(k) => v for (k, v) in pairs(JSON.parse(row.TravelsFor)))
+        hotelNbhdMap = Dict{Symbol,Int}(
+            Symbol(k) => v for (k, v) in pairs(JSON.parse(row.HotelNeighbourhoodIDs))
+        )
 
-        @assert houseID != 0
-        @assert (isStudent && schoolID > 0) || (!isStudent && officeID > 0)
-
-        # Create and add Person
-        @inbounds agents[index] = Models.Person(
+        # Construct the Person
+        agents[index] = Models.Person(
             id=agentID,
-            infectivity=Float32(1.0),
-            houseID=houseID,
-            officeID=officeID,
-            schoolID=schoolID,
+            infectivity=1.0f0,
+            location=(houseID, :House, city),
+            scheduleIDs=[scheduleID],
+            isStudent=isStudent,
             infection_state=infection_state,
             infection_time=infection_time,
             infected_by=-1,
-            location=(houseID, :House, city), 
-            scheduleIDs=[scheduleID],
-            travelOfficeID=travelOfficeID,
-            travelHotelID=travelHotelID,
-            travelsFor=travelsFor,
+            houseID=houseID,
+            schoolID=schoolID,
+            officeIDMap=officeIDMap,
+            hotelIDMap=hotelIDMap,
+            travelsFor=travelsForMap,
+            travelProbabilityMap=travelProbabilityMap,
             originCity=city,
             travelCity=travelCity,
             currentCity=city,
             travelStartStep=-1,
-            isTraveller=!isStudent
+            # isTraveller       = !isStudent
+            isTraveller=false,
         )
-        
-        # Check and add places if they do not exist
-        for (place_id, place_type, current_city) in [
-            (houseID, :House, city),
-            (officeID, :Office, city),
-            (schoolID, :School, city),
-            (travelOfficeID, :Office, travelCity),
-            (travelHotelID, :Hotel, travelCity)
-        ]
-            place_key = (place_id, place_type, current_city)
-            group = nothing
-            if Config.ALPHA > 0.0f0
-                if place_type == :House
-                    group_key = (houseNeighbourhoodID, :Neighbourhood, current_city)
-                    if !haskey(groups, group_key)
-                        groups[group_key] = Models.PlaceGroup(id=houseNeighbourhoodID, location_type=:Neighbourhood, city=current_city)
-                    end
-                    group = groups[group_key]
 
-                elseif place_type == :Hotel && current_city == travelCity && Config.TRAVEL_PROBABILITY > 0.0f0
-                    group_key = (hotelNeighbourhoodID, :Neighbourhood, travelCity)
-                    if !haskey(groups, group_key)
-                        groups[group_key] = Models.PlaceGroup(id=hotelNeighbourhoodID, location_type=:Neighbourhood, city=current_city)
+        # 1) Collect basic places: House, School
+        places_to_create = [(houseID, :House, city), (schoolID, :School, city)]
+
+        # 2) Offices from the officeIDMap
+        for (offCity, offID) in officeIDMap
+            if offID != 0
+                push!(places_to_create, (offID, :Office, offCity))
+            end
+        end
+
+        # 3) Hotels from the hotelIDMap
+        for (hotCity, hotID) in hotelIDMap
+            if hotID != 0
+                push!(places_to_create, (hotID, :Hotel, hotCity))
+            end
+        end
+
+        # Now create these places if needed
+        for (p_id, p_type, p_city) in places_to_create
+            if p_id == 0
+                println(p_id, row)
+                continue
+            end
+
+            place_key = (p_id, p_type, p_city)
+            if !haskey(places, place_key)
+                # Possibly assign group for House or Hotel
+                local_group = nothing
+                if config.ALPHA > 0.0f0
+                    if p_type == :House
+                        # House neighborhood (if you store it in the CSV or if row has HouseNeighbourhoodID)
+                        house_nbhd_id = get(row, :HouseNeighbourhoodID, 0)
+                        if house_nbhd_id != 0
+                            group_key = (house_nbhd_id, :Neighbourhood, p_city)
+                            if !haskey(groups, group_key)
+                                groups[group_key] = Models.PlaceGroup(
+                                    id=house_nbhd_id,
+                                    location_type=:Neighbourhood,
+                                    city=p_city,
+                                )
+                            end
+                            local_group = groups[group_key]
+                        end
+
+                    elseif p_type == :Hotel
+                        # Use the `hotelNbhdMap` to look up the correct neighborhood ID
+                        hotel_nbhd_id = get(hotelNbhdMap, p_city, 0)
+                        if hotel_nbhd_id != 0
+                            group_key = (hotel_nbhd_id, :Neighbourhood, p_city)
+                            if !haskey(groups, group_key)
+                                groups[group_key] = Models.PlaceGroup(
+                                    id=hotel_nbhd_id,
+                                    location_type=:Neighbourhood,
+                                    city=p_city,
+                                )
+                            end
+                            local_group = groups[group_key]
+                        end
                     end
-                    group = groups[group_key]
                 end
-            end 
 
-            if place_id != 0 && !haskey(places, place_key)
-                places[place_key] = Models.Place(id=place_id, location_type=place_type, city=current_city, group=group)
+                # Finally, create the Place
+                places[place_key] = Models.Place(
+                    id=p_id,
+                    location_type=p_type,
+                    city=p_city,
+                    group=local_group,
+                )
             end
         end
     end
@@ -103,30 +154,30 @@ function initialize(file_path::String)
     return nagents, agents, places, groups
 end
 
+
 function initialize_schedules()
     schedules = Dict(
         1 => Dict(0 => :House, 1 => :Office, 2 => :Office, 3 => :House), # Employee
         2 => Dict(0 => :House, 1 => :School, 2 => :School, 3 => :House), # Student
         3 => Dict(0 => :Hotel, 1 => :Office, 2 => :Office, 3 => :Hotel), # Traveller
-        4 => Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House) # Lockdown / Stay at home
+        config.SCHOOL_CLOSED_SCHEDULE_ID =>
+            Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House),  # School closed (for students)
+        config.OFFICE_CLOSED_SCHEDULE_ID =>
+            Dict(0 => :House, 1 => :House, 2 => :House, 3 => :House),   # Office closed (for non-students)
     )
     return schedules
 end
 
 
-function get_location_tuple(agent::Models.Person, location::Symbol)
+@inline function get_location_tuple(agent::Models.Person, location::Symbol)
     if location == :House
         return (agent.houseID, :House, agent.currentCity)
     elseif location == :Office
-        if agent.currentCity == agent.travelCity
-            return (agent.travelOfficeID, :Office, agent.currentCity)
-        else
-            return (agent.officeID, :Office, agent.currentCity)
-        end
+        return (agent.officeIDMap[agent.currentCity], :Office, agent.currentCity)
     elseif location == :School
         return (agent.schoolID, :School, agent.currentCity)
     elseif location == :Hotel
-        return (agent.travelHotelID, :Hotel, agent.currentCity)
+        return (agent.hotelIDMap[agent.currentCity], :Hotel, agent.currentCity)
     else
         @error "Invalid location specified for agent $(agent.id) with position $(agent.pos)"
         throw(ArgumentError("Invalid location specified: $(agent.pos)"))
@@ -149,27 +200,34 @@ function update_locations!(agents, places, groups, schedules, time_of_day, step)
         empty!(group.cumsum_weights)
     end
 
-    for agent in agents
+    @inbounds for i in eachindex(agents)
+        agent = agents[i]
         # Check for travel
-        if Config.TRAVEL_PROBABILITY > 0.0f0 && agent.isTraveller && time_of_day == 0
-            if agent.originCity == agent.currentCity
-                # Agent is not travelling right now, and it is the start of the day
-                if rand() < Config.TRAVEL_PROBABILITY
-                    agent.currentCity = agent.travelCity
-                    agent.travelStartStep = step
-                    push!(agent.scheduleIDs, 3)
-                end
-            
-            else
-                # Agent is travelling right now
-                if step >= agent.travelStartStep + agent.travelsFor * Config.TICKS
-                    agent.currentCity = agent.originCity
-                    pop!(agent.scheduleIDs)
+        if agent.isTraveller && time_of_day == 0
+            travelProbability = agent.travelProbabilityMap[agent.travelCity]
+            if travelProbability > 0.0f0
+                if agent.originCity == agent.currentCity
+                    # Agent is not travelling right now, and it is the start of the day
+                    if rand() < travelProbability
+                        agent.currentCity = agent.travelCity
+                        agent.travelStartStep = step
+                        push!(agent.scheduleIDs, 3)
+                    end
+
+                else
+                    # Agent is travelling right now
+                    if step >=
+                       agent.travelStartStep +
+                       agent.travelsFor[agent.travelCity] * config.TICKS
+                        agent.currentCity = agent.originCity
+                        pop!(agent.scheduleIDs)
+                    end
                 end
             end
         end
 
-        current_schedule = schedules[agent.scheduleIDs[end]]
+        agent_schedule_ID = agent.scheduleIDs[end]
+        current_schedule = schedules[agent_schedule_ID]
         new_location = get_location_tuple(agent, current_schedule[time_of_day])
         agent.location = new_location
 
@@ -199,7 +257,7 @@ function update_locations!(agents, places, groups, schedules, time_of_day, step)
         end
     end
 
-   for group in values(groups)
+    for group in values(groups)
         if group.totalCount > 0.0f0
             group.infectedFraction /= group.totalCount
             group.cumsum_weights = cumsum(group.cumsum_weights)
@@ -208,25 +266,32 @@ function update_locations!(agents, places, groups, schedules, time_of_day, step)
 end
 
 # Simulation step logic
-function simulation_step!(agents::Vector{Models.Person}, places::Dict{Tuple{Int, Symbol, Symbol}, Models.Place}, step::Int)
-    for agent in agents
+function simulation_step!(
+    agents::Vector{Models.Person},
+    places::Dict{Tuple{Int,Symbol,Symbol},Models.Place},
+    step::Int,
+)
+    Threads.@threads for i in 1:length(agents)
+        agent = agents[i]
         # Check for infection
         if agent.infection_state == :Susceptible
             current_location = agent.location
             place = places[current_location]
 
-            place_infection_rate = place.infectedFraction
-            group_infection_rate = place.group !== nothing ? place.group.infectedFraction : 0.0f0
-            infection_rate = place_infection_rate + Config.ALPHA * group_infection_rate
-            infection_prob = Config.BETA * infection_rate * Config.DT
+            local p_infection = place.infectedFraction
+            local g_infection = (place.group !== nothing ? place.group.infectedFraction : 0.0f0)
+            local infection_rate = (1 - config.ALPHA) * p_infection + config.ALPHA * g_infection
+            local infection_prob = config.BETA * infection_rate * config.DT
 
-            if rand() < infection_prob
-                if Config.ALPHA == 0.0f0 || rand() < place_infection_rate / infection_rate
-                    idx = searchsortedfirst(place.cumsum_weights, rand() * place.cumsum_weights[end])
-                    idx = clamp(idx, 1, length(place.cumsum_weights))
+            if infection_rate > 0 && rand() < infection_prob
+                if config.ALPHA == 0.0f0 || rand() < p_infection / infection_rate
+                    local cw = place.cumsum_weights
+                    local idx = searchsortedfirst(cw, rand() * cw[end])
+                    idx = clamp(idx, 1, length(cw))
                     agent.infected_by = place.infectors[idx]
                 else
-                    idx = searchsortedfirst(place.group.cumsum_weights, rand() * place.group.cumsum_weights[end])
+                    local cw = place.group.cumsum_weights
+                    local idx = searchsortedfirst(cw, rand() * cw[end])
                     idx = clamp(idx, 1, length(place.group.cumsum_weights))
                     agent.infected_by = place.group.infectors[idx]
                 end
@@ -234,10 +299,10 @@ function simulation_step!(agents::Vector{Models.Person}, places::Dict{Tuple{Int,
                 agent.infection_state = :Infected
                 agent.infection_time = step
             end
-        
-        # Check for recovery
+
+            # Check for recovery
         elseif agent.infection_state == :Infected
-            if rand() < Config.GAMMA * Config.DT
+            if rand() < config.GAMMA * config.DT
                 agent.infection_state = :Recovered
             end
         end
@@ -246,31 +311,36 @@ end
 
 
 function count_stats(nagents, agents, cities::Set{Symbol}, step::Int)
-    counts = Dict{String, Int}()
-    counts["Day"] = step ÷ Config.TICKS
-
+    counts = Dict{String,Int}()
+    counts["Day"] = step ÷ config.TICKS
     for city in cities
-        counts["Susceptible - $city"] = 0
-        counts["Infected - $city"] = 0
-        counts["Recovered - $city"] = 0
+        counts["Students - Susceptible - $city"] = 0
+        counts["Students - Infected - $city"] = 0
+        counts["Students - Recovered - $city"] = 0
+        counts["Adults - Susceptible - $city"] = 0
+        counts["Adults - Infected - $city"] = 0
+        counts["Adults - Recovered - $city"] = 0
     end
+    local total = 0
+    local state_map = Dict(
+        :Susceptible => "Susceptible",
+        :Infected => "Infected",
+        :Recovered => "Recovered"
+    )
 
-    total = 0
-    for agent in agents
+    @inbounds for agent in agents
         city = agent.originCity
-        if agent.infection_state == :Susceptible
-            counts["Susceptible - $city"] += 1
-        elseif agent.infection_state == :Infected
-            counts["Infected - $city"] += 1
-        elseif agent.infection_state == :Recovered
-            counts["Recovered - $city"] += 1
-        else
-            @error "Invalid infection state for agent $(agent.id)"
-            throw(ArgumentError("Invalid infection state for agent $(agent.id)"))
+        for (state, state_str) in state_map
+            if agent.infection_state == state
+                if agent.isStudent
+                    counts["Students - $state_str - $city"] += 1
+                else
+                    counts["Adults - $state_str - $city"] += 1
+                end
+            end
         end
         total += 1
     end
-
     @assert total == nagents
     return counts
 end
@@ -278,7 +348,7 @@ end
 # Main simulation loop
 function run_simulation()
     schedules = initialize_schedules()
-    nagents, agents, places, groups = initialize(Config.INPUTFILE)
+    nagents, agents, places, groups = initialize(config.INPUTFILE)
 
     cities = Set{Symbol}()
     for agent in agents
@@ -286,40 +356,56 @@ function run_simulation()
     end
     columns = ["Day"]
     for city in cities
-        push!(columns, "Susceptible - $city")
-        push!(columns, "Infected - $city")
-        push!(columns, "Recovered - $city")
+        push!(columns, "Students - Susceptible - $city")
+        push!(columns, "Students - Infected - $city")
+        push!(columns, "Students - Recovered - $city")
+        push!(columns, "Adults - Susceptible - $city")
+        push!(columns, "Adults - Infected - $city")
+        push!(columns, "Adults - Recovered - $city")
     end
     # results = DataFrame(columns)
-    results = DataFrame([[] for _ in columns], columns)
+    results = DataFrame()
+    for col in columns
+        results[!, col] = []
+    end
 
-    for step in 0:(Config.TICKS * Config.DAYS)
-        Interventions.prune_infection!(agents, step)
-        Interventions.handle_lockdown!(agents, step)
-        update_locations!(agents, places, groups, schedules, step % Config.TICKS, step)
+    for step = 0:(config.TICKS*config.DAYS)
+        Interventions.interventions!(agents, step)
+        update_locations!(agents, places, groups, schedules, step % config.TICKS, step)
 
-        if step % Config.TICKS == 0  # Daily summary
+        if step % config.TICKS == 0  # Daily summary
             row = count_stats(nagents, agents, cities, step)
             push!(results, row)
 
-            total_sus = sum(row["Susceptible - $city"] for city in cities)
-            total_inf = sum(row["Infected - $city"] for city in cities)
-            total_rec = sum(row["Recovered - $city"] for city in cities)
-            println("$(Dates.format(Dates.now(), "HH:MM:SS.sss")) | Day $(step ÷ Config.TICKS) | Susceptible: $total_sus | Infected: $total_inf | Recovered: $total_rec")
+            total_sus = 0
+            total_inf = 0
+            total_rec = 0
+
+            for city in cities
+                total_sus += row["Students - Susceptible - $city"] + row["Adults - Susceptible - $city"]
+                total_inf += row["Students - Infected - $city"] + row["Adults - Infected - $city"]
+                total_rec += row["Students - Recovered - $city"] + row["Adults - Recovered - $city"]
+            end
+            println("$(Dates.format(Dates.now(), "HH:MM:SS.sss")) | Day $(step ÷ config.TICKS) | Susceptible: $total_sus | Infected: $total_inf | Recovered: $total_rec",)
         end
-        
+
         simulation_step!(agents, places, step)
     end
 
-    dir = Config.OUTPUTDIR
+    dir = config.OUTPUTDIR
     isdir(dir) || mkpath(dir)
-    csvFile = "$dir/SIR$(Config.TIMESTAMP).csv"
+    csvFile = "$dir/SIR$(config.TIMESTAMP).csv"
     CSV.write(csvFile, results)
 
+    # Dump Config
+    config_dict = Dict(key => getfield(config, key) for key ∈ propertynames(config))
+    configFile = "$dir/config_$(config.TIMESTAMP).json"
+    open(configFile, "w") do f
+        JSON.print(f, config_dict, 2)  # 4-space indentation for readability
+    end
 end
 
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    Config.parseArgs!(ARGS)
     run_simulation()
 end

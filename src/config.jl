@@ -1,89 +1,143 @@
 module Config
 
-using Logging
 using Dates
+using TOML
 
-export INPUT, TICKS, BETA, GAMMA, DAYS, DT, OUTPUTDIR
+export SimulationConfig, load_config, config
 
-global TIMESTAMP = Int(floor(datetime2unix(Dates.now()) * 1e3))
-global INPUT = "SingleCompartment1000k"
-global INPUTFILE = "SingleCompartment1000k.csv"
-global TICKS = 4
-global BETA = 0.35
-global GAMMA = 0.14
-global ALPHA = 0.0
-global DAYS = 150
-global DT = 1 / TICKS
-global OUTPUTDIR = "outputs/Julia"
-global TRAVEL_PROBABILITY = 0.0
+"""
+    SimulationConfig
 
-global PRUNEDAY = 0
-global SCALE = 10
-global REMOVE_PROBABILITY = 1 - (1 / SCALE)
-global PRUNE = false
-global PRUNE_METHOD = "Random"
+A struct that holds all configuration parameters for the simulation run.
+"""
+struct SimulationConfig
+    TIMESTAMP::Int
+    INPUT::String
+    INPUTFILE::String
+    TICKS::Int
+    BETA::Float64
+    GAMMA::Float64
+    ALPHA::Float64
+    DAYS::Int
+    DT::Float64
+    OUTPUTDIR::String
+    PRUNEDAY::Int
+    SCALE::Int
+    REMOVE_PROBABILITY::Float64
+    PRUNE::Bool
+    PRUNE_METHOD::String
+    GENERATION_LOOKBACK::Int
+    SCHOOL_CLOSED::Bool
+    SCHOOL_CLOSED_DAYS::Vector{Int}
+    SCHOOL_CLOSED_DURATIONS::Vector{Int}
+    SCHOOL_CLOSED_STRENGTHS::Vector{Float64}
+    OFFICE_CLOSED::Bool
+    OFFICE_CLOSED_DAYS::Vector{Int}
+    OFFICE_CLOSED_DURATIONS::Vector{Int}
+    OFFICE_CLOSED_STRENGTHS::Vector{Float64}
+    SCHOOL_CLOSED_SCHEDULE_ID::Int
+    OFFICE_CLOSED_SCHEDULE_ID::Int
 
-global LOCKDOWN = false
-global LOCKDOWN_DAY = 0
-global LOCKDOWN_DURATION = 0
-
-
-function parseArgs!(args::Vector{String})
-    for arg in args
-        println(arg)
-        parts = split(arg, "=")
-        
-        if length(parts) != 2
-            throw(ArgumentError("Unsupported syntax for argument: \"$arg\". Flag syntax is `name=value`, without spaces."))
-        else
-            key = uppercase(parts[1])
-            value = parts[2]
-
-            # Update global variables based on the argument key
-            if key == "INPUT"
-                global INPUT = String(value)
-                global INPUTFILE = INPUT * ".csv"
-                @info("Set INPUT file to $INPUT")
-            elseif key == "BETA"
-                global BETA = parse(Float64, value)
-                @info("Set BETA to $BETA")
-            elseif key == "GAMMA"
-                global GAMMA = parse(Float64, value)
-                @info("Set GAMMA to $GAMMA")
-            elseif key == "ALPHA"
-                global ALPHA = parse(Float64, value)
-                @info("Set ALPHA to $ALPHA")
-            elseif key == "DAYS"
-                global DAYS = parse(Int, value)
-                @info("Set DAYS to $DAYS")
-            elseif key == "PRUNE"
-                global PRUNE = parse(Int, value) == 1
-                @info("Set PRUNE to $PRUNE")
-            elseif key == "PRUNEDAY"
-                global PRUNEDAY = parse(Int, value)
-                @info("Set PRUNEDAY to $PRUNEDAY")
-            elseif key == "PRUNEMETHOD"
-                global PRUNE_METHOD = String(value)
-                @info("Set PRUNE_METHOD to $PRUNE_METHOD")
-            elseif key == "TRAVEL"
-                global TRAVEL_PROBABILITY = parse(Float64, value)
-                @info("Set TRAVEL_PROBABILITY to $TRAVEL_PROBABILITY")
-            elseif key == "LOCKDOWN"
-                global LOCKDOWN = parse(Int, value) == 1
-                @info("Set LOCKDOWN to $LOCKDOWN")
-            elseif key == "LOCKDOWNDAY"
-                global LOCKDOWN_DAY = parse(Int, value)
-                @info("Set LOCKDOWN_DAY to $LOCKDOWN_DAY")
-            elseif key == "LOCKDOWNDURATION"
-                global LOCKDOWN_DURATION = parse(Int, value)
-                @info("Set LOCKDOWN_DURATION to $LOCKDOWN_DURATION")
-            else
-                throw(ArgumentError("Unsupported flag: \"$key\". Available flags are INPUT, TICKS, BETA, GAMMA, and DAYS."))
-            end
-        end
+    function SimulationConfig(;
+        TIMESTAMP,
+        INPUT,
+        INPUTFILE,
+        TICKS,
+        BETA,
+        GAMMA,
+        ALPHA,
+        DAYS,
+        DT,
+        OUTPUTDIR,
+        PRUNEDAY,
+        SCALE,
+        REMOVE_PROBABILITY,
+        PRUNE,
+        PRUNE_METHOD,
+        GENERATION_LOOKBACK,
+        SCHOOL_CLOSED,
+        SCHOOL_CLOSED_DAYS,
+        SCHOOL_CLOSED_DURATIONS,
+        SCHOOL_CLOSED_STRENGTHS,
+        OFFICE_CLOSED,
+        OFFICE_CLOSED_DAYS,
+        OFFICE_CLOSED_DURATIONS,
+        OFFICE_CLOSED_STRENGTHS,
+        SCHOOL_CLOSED_SCHEDULE_ID,
+        OFFICE_CLOSED_SCHEDULE_ID,
+    )
+        new(
+            TIMESTAMP,
+            INPUT,
+            INPUTFILE,
+            TICKS,
+            BETA,
+            GAMMA,
+            ALPHA,
+            DAYS,
+            DT,
+            OUTPUTDIR,
+            PRUNEDAY,
+            SCALE,
+            REMOVE_PROBABILITY,
+            PRUNE,
+            PRUNE_METHOD,
+            GENERATION_LOOKBACK,
+            SCHOOL_CLOSED,
+            SCHOOL_CLOSED_DAYS,
+            SCHOOL_CLOSED_DURATIONS,
+            SCHOOL_CLOSED_STRENGTHS,
+            OFFICE_CLOSED,
+            OFFICE_CLOSED_DAYS,
+            OFFICE_CLOSED_DURATIONS,
+            OFFICE_CLOSED_STRENGTHS,
+            SCHOOL_CLOSED_SCHEDULE_ID,
+            OFFICE_CLOSED_SCHEDULE_ID,
+        )
     end
-
-    global OUTPUTDIR = "outputs/beta$BETA-gamma$GAMMA-alpha$ALPHA-input$INPUT-days$DAYS-prune$PRUNE-pruneday$PRUNEDAY-prunemethod$PRUNE_METHOD-travel$TRAVEL_PROBABILITY-lockdown$LOCKDOWN-lockdownday$LOCKDOWN_DAY-lockdownduration$LOCKDOWN_DURATION"
 end
 
+"""
+    load_config(file_path::String) -> SimulationConfig
+
+Loads the simulation configuration from a TOML file.
+"""
+function load_config(file_path::String)
+    config_data = TOML.parsefile(file_path)
+
+    return SimulationConfig(
+        # Use current timestamp
+        TIMESTAMP=Int(floor(Dates.datetime2unix(Dates.now()) * 1e3)),
+        INPUT=get(config_data, "INPUT", "SingleCompartment1000k"),
+        INPUTFILE=get(config_data, "INPUT", "SingleCompartment1000k") * ".csv",
+        TICKS=get(config_data, "TICKS", 4),
+        BETA=get(config_data, "BETA", 0.35),
+        GAMMA=get(config_data, "GAMMA", 0.14),
+        ALPHA=get(config_data, "ALPHA", 0.0),
+        DAYS=get(config_data, "DAYS", 150),
+        DT=(1 / get(config_data, "TICKS", 4)),
+        PRUNEDAY=get(config_data, "PRUNEDAY", 0),
+        SCALE=get(config_data, "SCALE", 10),
+        REMOVE_PROBABILITY=get(config_data, "REMOVE_PROBABILITY", 0.9),
+        PRUNE=get(config_data, "PRUNE", false),
+        PRUNE_METHOD=get(config_data, "PRUNE_METHOD", "Random"),
+        GENERATION_LOOKBACK=get(config_data, "GENERATION_LOOKBACK", 0),
+        SCHOOL_CLOSED=get(config_data, "SCHOOL_CLOSED", false),
+        SCHOOL_CLOSED_DAYS=get(config_data, "SCHOOL_CLOSED_DAYS", Int[]),
+        SCHOOL_CLOSED_DURATIONS=get(config_data, "SCHOOL_CLOSED_DURATIONS", Int[]),
+        SCHOOL_CLOSED_STRENGTHS=get(config_data, "SCHOOL_CLOSED_STRENGTHS", Float64[]),
+        OFFICE_CLOSED=get(config_data, "OFFICE_CLOSED", false),
+        OFFICE_CLOSED_DAYS=get(config_data, "OFFICE_CLOSED_DAYS", Int[]),
+        OFFICE_CLOSED_DURATIONS=get(config_data, "OFFICE_CLOSED_DURATIONS", Int[]),
+        OFFICE_CLOSED_STRENGTHS=get(config_data, "OFFICE_CLOSED_STRENGTHS", Float64[]),
+        SCHOOL_CLOSED_SCHEDULE_ID=get(config_data, "SCHOOL_CLOSED_SCHEDULE_ID", 4),
+        OFFICE_CLOSED_SCHEDULE_ID=get(config_data, "OFFICE_CLOSED_SCHEDULE_ID", 5),
+        OUTPUTDIR="outputs/$file_path",
+    )
 end
+
+
+config_file = length(ARGS) > 0 ? ARGS[1] : "config.toml"
+config = load_config(config_file)
+
+end  # module Config

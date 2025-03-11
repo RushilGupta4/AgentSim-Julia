@@ -1,20 +1,25 @@
 module TreeUtils
 
-export TreeNode, build_infection_tree, get_predecessor, get_all_descendants, get_all_ancestors
+export TreeNode,
+    build_infection_tree, get_predecessor, get_all_descendants, get_all_ancestors
 
 import Main.Models
 
 
 mutable struct TreeNode{T}
     value::T
-    parent::Union{Nothing, TreeNode{T}}
+    parent::Union{Nothing,TreeNode{T}}
     children::Vector{TreeNode{T}}
     TreeNode(value::T) where {T} = new{T}(value, nothing, Vector{TreeNode{T}}())
 end
 
 function add_child!(parent::TreeNode{T}, child::TreeNode{T}) where {T}
     if child.parent !== nothing
-        throw(ArgumentError("Node $(child.value.id) already has a parent $(child.parent.value.id)"))
+        throw(
+            ArgumentError(
+                "Node $(child.value.id) already has a parent $(child.parent.value.id)",
+            ),
+        )
     else
         push!(parent.children, child)
         child.parent = parent
@@ -51,7 +56,7 @@ function get_predecessor(node::TreeNode{T}, n::Int) where {T}
 end
 
 function build_infection_tree(agents::Vector{Models.Person})
-    node_map = Dict{Int, TreeNode{Models.Person}}()
+    node_map = Dict{Int,TreeNode{Models.Person}}()
 
     for agent in agents
         node_map[agent.id] = TreeNode(agent)
