@@ -5,8 +5,11 @@
 *.csv
 *.py
 !dummy_population_generator.py
+!multi_city_population_generator.py
 *.png
 *.sh
+*.toml
+!config.toml.template
 
 venv/
 .env
