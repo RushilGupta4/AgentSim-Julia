@@ -10,13 +10,13 @@ function handle_office_closed!(agents::Vector{Models.Person}, step::Int)
         return
     end
 
-    current_day = step ÷ config.TICKS
-    active, day, duration, strength = get_office_closed_details(step)
-
     # Only check at the start of each day
     if step % config.TICKS != 0
         return
     end
+
+    current_day = step ÷ config.TICKS
+    active, day, duration, strength = get_office_closed_details(step)
 
     if current_day == day
         println("Starting office closure intervention on day $day")

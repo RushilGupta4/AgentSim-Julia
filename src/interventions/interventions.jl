@@ -11,7 +11,7 @@ import .OfficeClosed
 export interventions!, SchoolClosed, OfficeClosed
 
 function interventions!(agents, step)
-    Pruning.prune_infection!(agents, step)
+    # Pruning.prune_infection!(agents, step)
     SchoolClosed.handle_school_closed!(agents, step)
     OfficeClosed.handle_office_closed!(agents, step)
 end

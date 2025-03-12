@@ -271,7 +271,7 @@ function simulation_step!(
     places::Dict{Tuple{Int,Symbol,Symbol},Models.Place},
     step::Int,
 )
-    Threads.@threads for i in 1:length(agents)
+    for i in 1:length(agents)
         agent = agents[i]
         # Check for infection
         if agent.infection_state == :Susceptible
@@ -398,11 +398,11 @@ function run_simulation()
     CSV.write(csvFile, results)
 
     # Dump Config
-    config_dict = Dict(key => getfield(config, key) for key ∈ propertynames(config))
-    configFile = "$dir/config_$(config.TIMESTAMP).json"
-    open(configFile, "w") do f
-        JSON.print(f, config_dict, 2)  # 4-space indentation for readability
-    end
+    # config_dict = Dict(key => getfield(config, key) for key ∈ propertynames(config))
+    # configFile = "$dir/config_$(config.TIMESTAMP).json"
+    # open(configFile, "w") do f
+    #     JSON.print(f, config_dict, 2)  # 4-space indentation for readability
+    # end
 end
 
 
