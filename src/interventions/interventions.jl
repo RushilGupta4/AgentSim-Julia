@@ -1,19 +1,19 @@
 module Interventions
 
-include("./pruning.jl")
-include("./school_closed.jl")
-include("./office_closed.jl")
+include("./policy_based_interventions.jl")
 
-import .Pruning
-import .SchoolClosed
-import .OfficeClosed
+import .PolicyBasedInterventions
 
-export interventions!, SchoolClosed, OfficeClosed
+export interventions!
 
+"""
+    interventions!(agents, step)
+
+Calls the policy-based interventions check at every simulation step.
+Note: The policy-based check only updates lockdowns at the beginning of every week.
+"""
 function interventions!(agents, step)
-    # Pruning.prune_infection!(agents, step)
-    SchoolClosed.handle_school_closed!(agents, step)
-    OfficeClosed.handle_office_closed!(agents, step)
+    PolicyBasedInterventions.policy_interventions!(agents, step)
 end
 
-end
+end  # module Interventions

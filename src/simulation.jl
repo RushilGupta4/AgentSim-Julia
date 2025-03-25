@@ -369,7 +369,8 @@ function run_simulation()
         results[!, col] = []
     end
 
-    for step = 0:(config.TICKS*config.DAYS)
+    step = 0
+    while true
         Interventions.interventions!(agents, step)
         update_locations!(agents, places, groups, schedules, step % config.TICKS, step)
 
@@ -387,9 +388,14 @@ function run_simulation()
                 total_rec += row["Students - Recovered - $city"] + row["Adults - Recovered - $city"]
             end
             println("$(Dates.format(Dates.now(), "HH:MM:SS.sss")) | Day $(step ÷ config.TICKS) | Susceptible: $total_sus | Infected: $total_inf | Recovered: $total_rec",)
+
+            if total_inf < config.I_DISCRETIZATION * nagents * 0.25 && step >= config.DAYS * config.TICKS
+                break
+            end
         end
 
         simulation_step!(agents, places, step)
+        step += 1
     end
 
     dir = config.OUTPUTDIR
