@@ -89,7 +89,7 @@ function load_config(file_path::String)
         S_DISCRETIZATION=get(config_data, "S_DISCRETIZATION", 0.01),
         I_DISCRETIZATION=get(config_data, "I_DISCRETIZATION", 0.01),
         POLICY_FILE=get(config_data, "POLICY_FILE", "policy.json"),
-        OUTPUTDIR="outputs/$(get(config_data, "INPUT", "SingleCompartment1000k"))",
+        OUTPUTDIR=(get(config_data, "OUTPUTDIR", "outputs")),
     )
 end
 
