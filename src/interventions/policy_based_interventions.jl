@@ -26,26 +26,36 @@ function policy_interventions!(agents::Vector{Models.Person}, step::Int)
         return
     end
 
-    total_agents = length(agents)
-    susceptible_count = count(a -> a.infection_state == :Susceptible, agents)
-    infected_count = count(a -> a.infection_state == :Infected, agents)
-    S_frac = susceptible_count / total_agents
-    I_frac = infected_count / total_agents
+    total_students = count(a -> a.isStudent, agents)
+    total_adults = count(a -> !a.isStudent, agents)
+    susceptible_student_count = count(a -> a.infection_state == :Susceptible && a.isStudent, agents)
+    susceptible_adult_count = count(a -> a.infection_state == :Susceptible && !a.isStudent, agents)
+    infected_student_count = count(a -> a.infection_state == :Infected && a.isStudent, agents)
+    infected_adult_count = count(a -> a.infection_state == :Infected && !a.isStudent, agents)
+
+    # Compute the fractions of susceptible and infected individuals.
+    S_student_frac = susceptible_student_count / total_students
+    S_adult_frac = susceptible_adult_count / total_adults
+    I_student_frac = infected_student_count / total_students
+    I_adult_frac = infected_adult_count / total_adults
 
     # Discretize S and I using floor rounding.
-    disc_S = floor(S_frac / Config.config.S_DISCRETIZATION) * Config.config.S_DISCRETIZATION
-    disc_I = floor(I_frac / Config.config.I_DISCRETIZATION) * Config.config.I_DISCRETIZATION
+    disc_S_student = floor(S_student_frac / Config.config.S_DISCRETIZATION) * Config.config.S_DISCRETIZATION
+    disc_S_adult = floor(S_adult_frac / Config.config.S_DISCRETIZATION) * Config.config.S_DISCRETIZATION
+    disc_I_student = floor(I_student_frac / Config.config.I_DISCRETIZATION) * Config.config.I_DISCRETIZATION
+    disc_I_adult = floor(I_adult_frac / Config.config.I_DISCRETIZATION) * Config.config.I_DISCRETIZATION
 
     # Compute number of decimal places for discretization.
     S_places = length(digits(Int(1/Config.config.S_DISCRETIZATION)))
     I_places = length(digits(Int(1/Config.config.I_DISCRETIZATION)))
 
-    disc_S = round(disc_S, digits=S_places)
-    disc_I = round(disc_I, digits=I_places)
+    disc_S_student = round(disc_S_student, digits=S_places)
+    disc_S_adult = round(disc_S_adult, digits=S_places)
+    disc_I_student = round(disc_I_student, digits=I_places)
+    disc_I_adult = round(disc_I_adult, digits=I_places)
 
-
-    # Construct a key string; for example "0.99,0.02"
-    key = "$(disc_S),$(disc_I)"
+    # Construct a key string; for example "0.99,0.02,0.01,0.00".
+    key = "$(disc_S_student),$(disc_S_adult),$(disc_I_student),$(disc_I_adult)"
     if !haskey(POLICY, key)
         error("Policy key not found for discretized values: $key")
     end
